@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.21)
 # info
 project(
 	CustomCommandFramework
-	VERSION 1.0.0
+	VERSION 1.0.1
 	LANGUAGES CXX
 )
 
@@ -37,7 +37,6 @@ source_group(
 )
 
 # dependencies
-find_package(PolyHook_2 CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 find_dependency_path(DKUtil include/DKUtil/Logger.hpp)
 find_dependency_path(CommonLibSF CommonLibSF/include/SFSE/SFSE.h)
@@ -79,7 +78,6 @@ target_link_libraries(
 		DKUtil::DKUtil
 		CommonLibSF::CommonLibSF
 		spdlog::spdlog
-		PolyHook_2::PolyHook_2
 )
 
 # compiler def

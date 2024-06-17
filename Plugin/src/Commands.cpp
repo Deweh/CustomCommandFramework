@@ -1,5 +1,4 @@
 #include "Commands.h"
-#include "polyhook2/Detour/x64Detour.hpp"
 
 namespace Util
 {
@@ -126,45 +125,48 @@ namespace Commands
 		bool printedDefault = false;
 	};
 
-	typedef int64_t (*ExecuteCommandFunc)(void*, const char*);
+	typedef void (*ExecuteCommandFunc)(void*, char*);
 
-	std::unique_ptr<PLH::x64Detour> ExecuteCommandDetour = nullptr;
 	ExecuteCommandFunc OriginalExecuteCommand;
 	std::mutex regLock;
 	std::unordered_map<std::string, CCF::CommandCallback> registrations;
 	Interface intfc;
 
-	int64_t ExecuteCommand(void* a1, const char* a_cmd, ...)
+	void ExecuteCommand(void* arg1, char* a_cmd)
 	{
 		if (!a_cmd) {
-			return OriginalExecuteCommand(a1, a_cmd);
+			return OriginalExecuteCommand(arg1, a_cmd);
 		}
 
-		std::string_view cmdView(a_cmd);
+		std::string cmdView(a_cmd);
+		if (cmdView.empty()) {
+			return OriginalExecuteCommand(arg1, a_cmd);
+		}
+
 		auto args = Util::str_split(cmdView, " ", '\"');
 		std::unique_lock l{ regLock };
 		if (auto iter = registrations.find(Util::str_tolower(args[0])); iter != registrations.end()) {
+			a_cmd[0] = '\0';
+
 			args.erase(args.begin());
 			auto argsSSV = Util::sv_vec_to_ssv_vec(args);
 			CCF::simple_array<CCF::simple_string_view> argsArr(argsSSV);
 
-			intfc.Reset(a_cmd);
-			iter->second(argsArr, a_cmd, &intfc);
+			intfc.Reset(cmdView.c_str());
+			iter->second(argsArr, cmdView.c_str(), &intfc);
 			intfc.PrintDefault();
-			return 0;
-		} else {
-			return OriginalExecuteCommand(a1, a_cmd);
+			return;
 		}
+
+		return OriginalExecuteCommand(arg1, a_cmd);
 	}
 
 	void InstallHooks()
 	{
-		REL::Relocation<uintptr_t> hookLoc{ REL::ID(166307) };
-		ExecuteCommandDetour = std::make_unique<PLH::x64Detour>(
-			static_cast<uint64_t>(hookLoc.address()),
-			reinterpret_cast<uint64_t>(&ExecuteCommand),
-			reinterpret_cast<uint64_t*>(&OriginalExecuteCommand));
-		ExecuteCommandDetour->hook();
+		REL::Relocation<uintptr_t> hookLoc{ REL::ID(166307), 0xD2 };
+		SFSE::AllocTrampoline(14);
+		auto& trampoline = SFSE::GetTrampoline();
+		OriginalExecuteCommand = reinterpret_cast<ExecuteCommandFunc>(trampoline.write_call<5>(hookLoc.address(), &ExecuteCommand));
 
 		INFO("Installed command hook.");
 	}

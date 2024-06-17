@@ -10,7 +10,6 @@
     "nlohmann-json",
     "simpleini",
     "tomlplusplus",
-    "xbyak",
-    "polyhook2"
+    "xbyak"
   ]
 }
